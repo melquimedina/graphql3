@@ -136,7 +136,7 @@ class PageTest extends TestCase
             ->createRecord('pages', [
                 'pid' => 1,
                 'title' => 'some title',
-                'doktype' => PageRepository::DOKTYPE_RECYCLER,
+'doktype' => PageRepository::DOKTYPE_DEFAULT,
             ])
             ->createRecord('pages', [
                 'pid' => 1,
