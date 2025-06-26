@@ -23,7 +23,7 @@ use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Frontend\Authentication\FrontendUserAuthentication;
 use TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer;
-use TYPO3\CMS\Frontend\Controller\TypoScriptFrontendController;
+use TYPO3\CMS\Frontend\Page\TypoScriptFrontendInitialization;
 
 class ContentRenderRecordTypeBuilderExtender implements RecordTypeBuilderExtenderInterface
 {
@@ -37,7 +37,7 @@ class ContentRenderRecordTypeBuilderExtender implements RecordTypeBuilderExtende
 
     public const ERROR_UNEXPECTED_TYPO3_CORE_CODE = 'Content rendering on graphql3 is very different on each typo3 version. However an unexpected state of core code was detected on runtime.';
 
-    public function __construct(protected CurrentSession $currentSession, protected Typo3Environment $typo3Environment)
+    public function __construct(protected CurrentSession $currentSession, protected Typo3Environment $typo3Environment, protected TypoScriptFrontendInitialization $tsfeInitialization)
     {
     }
 
@@ -66,10 +66,11 @@ class ContentRenderRecordTypeBuilderExtender implements RecordTypeBuilderExtende
                     throw new InternalErrorException(self::ERROR_COULD_NOT_RESOLVE_FRONTEND_USER_ASPECT);
                 }
 
-                // We create the frontend controller locally (without $GLOBALS)
-                $tsfe = $this->createFrontendController($site, $language, $pageId, $frontendUser);
-
-                // Render content without using $GLOBALS['TSFE']
+                $tsfe = $this->tsfeInitialization->initialize(
+                    $site,
+                    $language,
+                    new PageArguments($pageId, '0', [])
+                );
                 return $this->renderContentWithoutGlobals($tsfe, $request, $record);
             })
         ;
@@ -78,7 +79,7 @@ class ContentRenderRecordTypeBuilderExtender implements RecordTypeBuilderExtende
     }
 
     protected function renderContentWithoutGlobals(
-        TypoScriptFrontendController $tsfe,
+        object $tsfe,
         ServerRequestInterface $request,
         Record $record
     ): string {
@@ -103,31 +104,13 @@ class ContentRenderRecordTypeBuilderExtender implements RecordTypeBuilderExtende
             'dontCheckPid' => 1,
         ]);
 
-        // We do not use $GLOBALS['TSFE'] or INTincScript to avoid that global
-
         $tsfe->releaseLocks();
 
         return $renderedContent;
     }
 
-    protected function createRenderer(TypoScriptFrontendController $tsfe): ContentObjectRenderer
+    protected function createRenderer(object $tsfe): ContentObjectRenderer
     {
         return GeneralUtility::makeInstance(ContentObjectRenderer::class, $tsfe);
-    }
-
-    private function createFrontendController(
-        SiteInterface $site,
-        SiteLanguage $language,
-        int $pageId,
-        FrontendUserAuthentication $frontendUser
-    ): TypoScriptFrontendController {
-        return GeneralUtility::makeInstance(
-            TypoScriptFrontendController::class,
-            GeneralUtility::makeInstance(Context::class),
-            $site,
-            $language,
-            new PageArguments($pageId, '0', []),
-            $frontendUser
-        );
     }
 }
